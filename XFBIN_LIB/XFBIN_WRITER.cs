@@ -275,6 +275,17 @@ namespace XFBIN_LIB
         {
             XFBIN.XFBIN xfbin_file = XFBIN_WRITER.ReadDirectoryXFBIN(path);
             string outputFile = Path.Combine(Path.GetDirectoryName(path), Path.GetFileName(path) + ".xfbin");
+            RepackXfbinData(xfbin_file, outputFile);
+        }
+
+        /// <summary>
+        /// Menulis objek XFBIN.XFBIN yang sudah ada di memori (mis. hasil XFBIN_READER.ReadXFBIN
+        /// yang lalu diedit) langsung ke outputFile. Logikanya SAMA PERSIS dengan body writer yang
+        /// sebelumnya menyatu di RepackXFBIN(path) — cuma dipisah supaya bisa dipanggil dengan
+        /// objek XFBIN yang sudah dimodifikasi di memori, tanpa perlu re-read dari direktori.
+        /// </summary>
+        public static void RepackXfbinData(XFBIN.XFBIN xfbin_file, string outputFile)
+        {
             if (File.Exists(outputFile))
             {
                 File.Delete(outputFile);
@@ -357,6 +368,71 @@ namespace XFBIN_LIB
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Mengganti nama chunk (entry di ChunkNames) dan file path terkaitnya (entry di FilePaths,
+        /// ditemukan lewat CHUNK_MAP yang menunjuk ke ChunkNameIndex yang sama) untuk sebuah chunk
+        /// yang sudah ada di memori. Dipakai NUS3BANKViewModel.SaveFileAs() untuk mengubah nama file
+        /// NUS3BANK sebelum di-repack ulang.
+        /// Setelah mengubah isi string, ukuran-ukuran section pada ChunkTable (yang disimpan literal
+        /// di header .xfbin) WAJIB dihitung ulang — dipakai rumus yang SAMA PERSIS dengan yang sudah
+        /// dipakai ReadDirectoryXFBIN() di atas (lihat RecalculateChunkTableSizes), supaya file hasil
+        /// repack tidak korup gara-gara panjang string baru beda dengan yang lama.
+        /// </summary>
+        public static void ChangeChunkNameAndPath(XFBIN.XFBIN xfbinFile, string oldChunkName, string newFilePath, string newChunkName)
+        {
+            int chunkNameIndex = -1;
+            for (int i = 0; i < xfbinFile.ChunkTable.ChunkNames.Count; i++)
+            {
+                if (xfbinFile.ChunkTable.ChunkNames[i].ChunkName == oldChunkName)
+                {
+                    chunkNameIndex = i;
+                    break;
+                }
+            }
+            if (chunkNameIndex == -1)
+                return; // Nama chunk tidak ditemukan — tidak melakukan apa-apa, biar aman.
+
+            xfbinFile.ChunkTable.ChunkNames[chunkNameIndex].ChunkName = newChunkName;
+
+            foreach (CHUNK_MAP map in xfbinFile.ChunkTable.ChunkMaps)
+            {
+                if ((int)map.ChunkNameIndex == chunkNameIndex)
+                {
+                    int filePathIndex = (int)map.FilePathIndex;
+                    if (filePathIndex >= 0 && filePathIndex < xfbinFile.ChunkTable.FilePaths.Count)
+                    {
+                        xfbinFile.ChunkTable.FilePaths[filePathIndex].FilePathName = newFilePath;
+                    }
+                }
+            }
+
+            RecalculateChunkTableSizes(xfbinFile);
+        }
+
+        /// <summary>
+        /// Rumus identik dengan yang dipakai ReadDirectoryXFBIN() di atas untuk menghitung
+        /// ChunkTypeSize/FilePathSize/ChunkNameSize/ChunkMapSize/ChunkTableSize.
+        /// </summary>
+        private static void RecalculateChunkTableSizes(XFBIN.XFBIN xfbinFile)
+        {
+            uint chunkTypeSize = 0, filePathSize = 0, chunkNameSize = 0;
+            foreach (CHUNK_TYPE t in xfbinFile.ChunkTable.ChunkTypes) chunkTypeSize += (uint)t.ChunkTypeName.Length + 1;
+            foreach (FILE_PATH p in xfbinFile.ChunkTable.FilePaths) filePathSize += (uint)p.FilePathName.Length + 1;
+            foreach (CHUNK_NAME n in xfbinFile.ChunkTable.ChunkNames) chunkNameSize += (uint)n.ChunkName.Length + 1;
+
+            xfbinFile.ChunkTable.ChunkTypeSize = chunkTypeSize;
+            xfbinFile.ChunkTable.FilePathSize = filePathSize;
+            xfbinFile.ChunkTable.ChunkNameSize = chunkNameSize;
+            xfbinFile.ChunkTable.ChunkMapSize = (uint)xfbinFile.ChunkTable.ChunkMaps.Count * 0xC;
+
+            xfbinFile.ChunkTableSize = 0x28
+                + xfbinFile.ChunkTable.ChunkNameSize
+                + xfbinFile.ChunkTable.ChunkTypeSize
+                + xfbinFile.ChunkTable.FilePathSize
+                + xfbinFile.ChunkTable.ChunkMapSize
+                + (xfbinFile.ChunkTable.ChunkMapIndicesCount * 4);
         }
 
 

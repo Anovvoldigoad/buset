@@ -217,6 +217,52 @@ namespace XFBIN_LIB
 
             return XfbinFile.ChunkTable.ChunkTypes[(int)XfbinFile.ChunkTable.ChunkMaps[index].ChunkTypeIndex].ChunkTypeName;
         }
+
+        /// <summary>
+        /// Hasil pencarian FindChunks: satu chunk beserta metadata (nama & tipe) yang sudah
+        /// diresolusi lewat rantai index yang sama dengan yang dipakai ReadXFBIN/GetXfbinChunkType.
+        /// </summary>
+        public class FoundChunk
+        {
+            public CHUNK Chunk { get; set; }
+            public PAGE Page { get; set; }
+            public string ChunkName { get; set; }
+            public string ChunkTypeName { get; set; }
+        }
+
+        /// <summary>
+        /// Mencari semua chunk pada XfbinFile yang sudah dibaca (lewat ReadXFBIN) yang tipenya
+        /// cocok dengan chunkTypeName (mis. "nuccChunkNub", "nuccChunkBinary").
+        /// Rantai resolusi index (Chunk.ChunkMapIndex -> ChunkMapIndices -> ChunkMaps ->
+        /// ChunkTypes/ChunkNames) identik dengan yang sudah dipakai di ReadXFBIN() dan
+        /// GetXfbinChunkType() di atas — bukan logika baru, cuma dipaparkan lewat method
+        /// pencarian yang bisa dipanggil dari luar.
+        /// </summary>
+        public List<FoundChunk> FindChunks(string chunkTypeName)
+        {
+            List<FoundChunk> results = new List<FoundChunk>();
+            foreach (PAGE page in XfbinFile.Pages)
+            {
+                foreach (CHUNK chunk in page.Chunks)
+                {
+                    int actualMapIdx = (int)XfbinFile.ChunkTable.ChunkMapIndices[(int)chunk.ChunkMapIndex].ChunkMapIndex;
+                    CHUNK_MAP map = XfbinFile.ChunkTable.ChunkMaps[actualMapIdx];
+                    string typeName = XfbinFile.ChunkTable.ChunkTypes[(int)map.ChunkTypeIndex].ChunkTypeName;
+                    if (typeName == chunkTypeName)
+                    {
+                        string chunkName = XfbinFile.ChunkTable.ChunkNames[(int)map.ChunkNameIndex].ChunkName;
+                        results.Add(new FoundChunk
+                        {
+                            Chunk = chunk,
+                            Page = page,
+                            ChunkName = chunkName,
+                            ChunkTypeName = typeName
+                        });
+                    }
+                }
+            }
+            return results;
+        }
     }
     public static class Helpers
     {
