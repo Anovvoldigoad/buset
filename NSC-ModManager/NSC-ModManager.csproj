@@ -105,6 +105,10 @@
     <!-- ModernWpfUI, ModernWpf.MessageBox: diganti MessageBox WPF native + BasicDarkTheme.xaml -->
     <!-- WindowsAPICodePack-Shell: diganti Microsoft.Win32.OpenFolderDialog (native .NET 8+) -->
     <!-- NodeNetwork, NodeNetworkToolkit: dikonfirmasi dead dependency, tak dipakai View manapun -->
+    <!-- DynamicData: TETAP DIPERTAHANKAN sebagai direct reference — dipakai langsung di 18 file
+         Model/ViewModel (bukan bagian NodeNetwork yang dibuang, kemarin cuma nebeng transitif
+         lewat NodeNetworkToolkit). Pure managed/netstandard, tidak ada dependensi UI/DWM sama sekali. -->
+    <PackageReference Include="DynamicData" Version="9.4.1" />
     <PackageReference Include="Extended.Wpf.Toolkit" Version="4.5.1" />
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="NAudio.WaveFormRenderer" Version="2.0.0" />

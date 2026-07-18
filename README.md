@@ -26,6 +26,7 @@ Repo ini berisi dua proyek sebagai sibling folder (dibutuhkan oleh `ProjectRefer
 | 12 | `TargetFramework`: `net10.0-windows10.0.26100.0` → `net8.0-windows` (LTS) | `NSC-ModManager.csproj` |
 | 13 | `PlatformTarget`: `x86` → `x64`, `Prefer32Bit`: `false` | `NSC-ModManager.csproj` |
 | 14 | Hapus paket NuGet: `ModernWpfUI`, `ModernWpf.MessageBox`, `WindowsAPICodePack-Shell`, `NodeNetwork`, `NodeNetworkToolkit` | `NSC-ModManager.csproj` |
+| 15 | **[Fix build]** Kembalikan `DynamicData` sebagai direct `PackageReference` (v9.4.1) — dipakai langsung di 18 file `Model`/`ViewModel`/`View`, kemarin cuma nebeng transitif lewat `NodeNetworkToolkit` dan sempat ikut hilang | `NSC-ModManager.csproj` |
 
 **Yang TIDAK disentuh sama sekali** (sesuai permintaan awal): `Model/*.cs`, seluruh logic parsing di `ViewModel/*.cs` (di luar baris dialog/MessageBox yang disebut eksplisit di atas), `XfbinParser.cs`, `BinaryReader.cs`, `Converter/*.cs`, `Controls/KuramaControl.xaml`/`LoadingControl.xaml` (memang tidak pernah pakai ModernWpf), seluruh proyek `XFBIN_LIB`.
 
