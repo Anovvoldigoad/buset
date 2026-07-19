@@ -17,6 +17,12 @@ REM ============================================================
 
 set DOTNET_EnableWriteXorExecute=0
 
+REM Fix crash "Cannot find non-neutral culture related to 'en-us'" (ICU tidak
+REM tersedia/rusak di Wine). Sudah di-bake permanen lewat <InvariantGlobalization>
+REM di csproj, baris ini cuma jaring pengaman kalau exe kebetulan dijalankan
+REM tanpa lewat launcher ini.
+set DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
+
 REM Cadangan tambahan (aktifkan/hapus REM salah satu baris di bawah
 REM kalau langkah di atas SAJA belum cukup menyelesaikan hang):
 REM set DOTNET_TieredPGO=0
