@@ -82,7 +82,58 @@ namespace NSC_ModManager
 
         public App()
         {
+            // Dipasang PALING AWAL, sebelum InitializeComponent, supaya menangkap
+            // exception apa pun sedini mungkin di startup.
+            //
+            // Log Wine (wine_wfm_*.txt) yang dikirim menunjukkan proses berhenti
+            // lewat RaiseFailFastException setelah exception native 0xe0434352
+            // (kode SEH standar yang dipakai CoreCLR untuk merepresentasikan
+            // managed exception) — itu tanda ADA EXCEPTION C# YANG TIDAK TERTANGANI,
+            // tapi Wine cuma mencatat native call-stack (kernelbase.dll/coreclr.dll),
+            // BUKAN pesan/stack trace C# aslinya. Tanpa handler ini kita cuma bisa
+            // menebak. Dengan handler ini, exception sesungguhnya (Message + tipe +
+            // StackTrace C#) akan ditulis ke "crash.log" di folder yang sama dengan
+            // exe, supaya bisa didiagnosis dari data asli, bukan tebakan.
+            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+                LogCrash("AppDomain.UnhandledException", e.ExceptionObject as Exception, terminating: e.IsTerminating);
+
+            this.DispatcherUnhandledException += (s, e) =>
+            {
+                LogCrash("DispatcherUnhandledException", e.Exception, terminating: false);
+                // Coba tampilkan pesan ke user & JANGAN langsung crash kalau masih bisa dilanjutkan.
+                try
+                {
+                    System.Windows.MessageBox.Show(
+                        "Terjadi error yang tidak tertangani:\n\n" + e.Exception.GetType().FullName + ": " + e.Exception.Message +
+                        "\n\nDetail lengkap sudah ditulis ke crash.log di folder aplikasi.",
+                        "NSC Mod Manager - Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                } catch { /* UI subsystem sendiri mungkin yang bermasalah — abaikan */ }
+                e.Handled = true; // Cegah proses langsung mati kalau errornya bisa dilewati.
+            };
+
+            TaskScheduler.UnobservedTaskException += (s, e) =>
+            {
+                LogCrash("TaskScheduler.UnobservedTaskException", e.Exception, terminating: false);
+                e.SetObserved();
+            };
+
             InitializeComponent();
+        }
+
+        private static void LogCrash(string source, Exception ex, bool terminating)
+        {
+            try
+            {
+                string logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crash.log");
+                string content =
+                    $"===== {DateTime.Now:yyyy-MM-dd HH:mm:ss} | Source: {source} | Terminating: {terminating} =====\n" +
+                    (ex?.ToString() ?? "(exception object null / bukan Exception)") +
+                    "\n\n";
+                File.AppendAllText(logPath, content);
+            } catch
+            {
+                // Kalau nulis log pun gagal, tidak ada lagi yang bisa dilakukan di titik ini.
+            }
         }
 
         private static bool IsDllPresent(string dllName)
