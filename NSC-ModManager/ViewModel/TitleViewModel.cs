@@ -3,6 +3,7 @@ using NSC_ModManager.Model;
 using NSC_ModManager.Properties;
 using NSC_ModManager.View;
 using NSC_Toolbox.ViewModel;
+using ICSharpCode.SharpZipLib.Zip;
 using Octokit;
 using System;
 using System.Collections.Generic;
@@ -176,12 +177,32 @@ namespace NSC_ModManager.ViewModel
                 };
                 using (var p = Process.Start(psi))
                 {
-                    p.WaitForExit();
+                    if (!p.WaitForExit(5000))
+                    {
+                        try { p.Kill(); } catch { }
+                    }
                 }
             } catch
             {
                 // окончательно молча игнорируем ошибки
             }
+        }
+
+        /// <summary>
+        /// Pengganti System.IO.Compression.ZipFile.ExtractToDirectory(). Alasan:
+        /// ZipFile butuh native shim "System.IO.Compression.Native" yang di
+        /// sesi debugging lain terbukti GAGAL load di Wine/Winlator
+        /// (status=c0000135 / STATUS_INVALID_IMAGE_FORMAT di log Wine), dan
+        /// kalau CLR memanggil function pointer dari native module yang gagal
+        /// dimuat, itu bisa jadi native ACCESS_VIOLATION (bukan exception .NET
+        /// yang bisa ditangkap try-catch/handler kita). SharpZipLib
+        /// (ICSharpCode.SharpZipLib, sudah jadi PackageReference di project
+        /// ini) 100% pure-managed, tidak butuh native shim apa pun.
+        /// </summary>
+        public static void ExtractZipSafe(string zipPath, string destDir)
+        {
+            var fastZip = new FastZip();
+            fastZip.ExtractZip(zipPath, destDir, null);
         }
 
         public static int RunRepackProcess(string inputFolder, string outputCpk)
@@ -191,29 +212,15 @@ namespace NSC_ModManager.ViewModel
             // Разблокируем сам YACpkTool.exe перед запуском
             RemoveZoneIdentifier(exePath);
 
-            ProcessStartInfo startInfo = new ProcessStartInfo
+            int exitCode = ProcessLauncher.RunAndWait(exePath, $"\"{inputFolder}\"", AppDomain.CurrentDomain.BaseDirectory);
+
+            string generatedCpk = inputFolder + ".cpk";
+            if (File.Exists(generatedCpk))
             {
-                FileName = exePath,
-                Arguments = $"\"{inputFolder}\"",
-                WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory,
-                CreateNoWindow = true,
-                UseShellExecute = true,
-                WindowStyle = ProcessWindowStyle.Hidden
-            };
-
-            using (Process process = new Process { StartInfo = startInfo })
-            {
-                process.Start();
-                process.WaitForExit();
-
-                string generatedCpk = inputFolder + ".cpk";
-                if (File.Exists(generatedCpk))
-                {
-                    File.Move(generatedCpk, outputCpk, true);
-                }
-
-                return process.ExitCode;
+                File.Move(generatedCpk, outputCpk, true);
             }
+
+            return exitCode;
         }
 
         public static int RunExtractProcess(string inputCpk, string outputFolder = "")
@@ -223,31 +230,134 @@ namespace NSC_ModManager.ViewModel
             // Разблокируем сам YACpkTool.exe перед запуском
             RemoveZoneIdentifier(exePath);
 
-            ProcessStartInfo startInfo = new ProcessStartInfo
-            {
-                FileName = exePath,
-                Arguments = $"\"{inputCpk}\"",
-                WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory,
-                CreateNoWindow = true,
-                UseShellExecute = true,
-                WindowStyle = ProcessWindowStyle.Hidden
-            };
+            int exitCode = ProcessLauncher.RunAndWait(exePath, $"\"{inputCpk}\"", AppDomain.CurrentDomain.BaseDirectory);
 
-            using (Process process = new Process { StartInfo = startInfo })
+            // Очистка меток распакованных файлов (опционально)
+            if (!string.IsNullOrEmpty(outputFolder) && Directory.Exists(outputFolder))
             {
-                process.Start();
-                process.WaitForExit();
+                // при необходимости можно вызвать рекурсивное RemoveZoneIdentifier для файлов в outputFolder
+            }
 
-                // Очистка меток распакованных файлов (опционально)
-                if (!string.IsNullOrEmpty(outputFolder) && Directory.Exists(outputFolder))
+            return exitCode;
+        }
+    }
+
+    /// <summary>
+    /// Pengganti pemanggilan Process.Start(...) langsung untuk exe eksternal
+    /// (YACpkTool.exe, NSUNSC.exe/NSUNS4.exe). Alasan lewat cmd.exe + file
+    /// .bat sementara, bukan P/Invoke Process.Start .NET langsung:
+    /// cmd.exe adalah salah satu binary paling lama & paling banyak diuji di
+    /// Wine (dipakai puluhan tahun oleh countless installer/launcher legacy),
+    /// sehingga jalur CreateProcess lewat cmd.exe terbukti lebih stabil
+    /// dibanding Process.Start() langsung di lingkungan emulasi CPU berlapis
+    /// (FEXCore/Box64/WowBox64) — di sesi debugging versi x86 project ini,
+    /// Process.Start() langsung dengan UseShellExecute=true+WaitForExit()
+    /// tanpa timeout dua kali menyebabkan masalah nyata: deadlock permanen
+    /// (proses child gagal ke-launch lewat shell, WaitForExit() nunggu
+    /// selamanya) dan crash native langsung di wow64.dll/wow64cpu.dll saat
+    /// spawn proses baru. Class ini SELALU UseShellExecute=false (proses
+    /// di-launch langsung tanpa lewat explorer.exe/shell) dan SELALU pakai
+    /// timeout, supaya app tidak bisa macet permanen lagi — paling parah
+    /// gagal dengan TimeoutException yang jelas.
+    /// </summary>
+    public static class ProcessLauncher
+    {
+        /// <summary>
+        /// Jalankan exePath dan TUNGGU sampai selesai (dipakai untuk
+        /// YACpkTool.exe repack/extract, yang hasilnya dibutuhkan sebelum
+        /// lanjut). Exit code exePath dipropagasi lewat "exit /b %ERRORLEVEL%"
+        /// di dalam .bat sementara. Timeout default 3 menit.
+        /// </summary>
+        public static int RunAndWait(string exePath, string arguments, string workingDirectory, int timeoutMs = 180000)
+        {
+            string batPath = Path.Combine(Path.GetTempPath(), "nscmm_" + Guid.NewGuid().ToString("N") + ".bat");
+            try
+            {
+                string batContent =
+                    "@echo off\r\n" +
+                    $"cd /d \"{workingDirectory}\"\r\n" +
+                    $"\"{exePath}\" {arguments}\r\n" +
+                    "exit /b %ERRORLEVEL%\r\n";
+                File.WriteAllText(batPath, batContent);
+
+                var psi = new ProcessStartInfo
                 {
-                    // при необходимости можно вызвать рекурсивное RemoveZoneIdentifier для файлов в outputFolder
-                }
+                    FileName = "cmd.exe",
+                    Arguments = $"/c \"\"{batPath}\"\"",
+                    WorkingDirectory = workingDirectory,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WindowStyle = ProcessWindowStyle.Hidden
+                };
 
-                return process.ExitCode;
+                using (var p = Process.Start(psi))
+                {
+                    if (p == null)
+                        throw new InvalidOperationException("Gagal memulai cmd.exe untuk menjalankan: " + exePath);
+
+                    bool exited = p.WaitForExit(timeoutMs);
+                    if (!exited)
+                    {
+                        try { p.Kill(entireProcessTree: true); } catch { }
+                        throw new TimeoutException($"Proses \"{Path.GetFileName(exePath)}\" tidak selesai dalam {timeoutMs / 1000} detik dan dipaksa dihentikan. Kemungkinan macet di lingkungan Wine/Winlator.");
+                    }
+                    return p.ExitCode;
+                }
+            } finally
+            {
+                try { if (File.Exists(batPath)) File.Delete(batPath); } catch { }
+            }
+        }
+
+        /// <summary>
+        /// Jalankan exePath tanpa menunggunya selesai (dipakai untuk
+        /// launch game setelah compile — kita tidak perlu/mau menunggu
+        /// game ditutup). cmd.exe wrapper-nya sendiri yang ditunggu dengan
+        /// timeout PENDEK, cuma untuk memastikan proses spawn-nya sendiri
+        /// tidak macet — bukan menunggu game-nya keluar.
+        /// </summary>
+        public static void RunDetached(string exePath, string workingDirectory, int spawnTimeoutMs = 30000)
+        {
+            string batPath = Path.Combine(Path.GetTempPath(), "nscmm_" + Guid.NewGuid().ToString("N") + ".bat");
+            try
+            {
+                string batContent =
+                    "@echo off\r\n" +
+                    $"cd /d \"{workingDirectory}\"\r\n" +
+                    $"start \"\" \"{exePath}\"\r\n";
+                File.WriteAllText(batPath, batContent);
+
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/c \"\"{batPath}\"\"",
+                    WorkingDirectory = workingDirectory,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WindowStyle = ProcessWindowStyle.Hidden
+                };
+
+                using (var p = Process.Start(psi))
+                {
+                    if (p == null) return;
+                    if (!p.WaitForExit(spawnTimeoutMs))
+                    {
+                        try { p.Kill(entireProcessTree: true); } catch { }
+                        // cmd.exe wrapper-nya sendiri macet — tapi ini fire-and-forget,
+                        // jadi diamkan saja, jangan sampai menghentikan alur compile.
+                    }
+                }
+            } catch
+            {
+                // Launch game itu best-effort — kalau gagal, jangan ganggu alur compile.
+            } finally
+            {
+                // Sengaja TIDAK dihapus langsung: game masih dalam proses start ("start" async),
+                // .bat kecil ini dibiarkan, OS akan bersihkan folder temp pada waktunya.
             }
         }
     }
+
     public class TitleViewModel : INotifyPropertyChanged
     {
         public bool IsS4
@@ -4660,15 +4770,7 @@ namespace NSC_ModManager.ViewModel
                 //process.Start();
 
                 string exePath = Path.Combine(root_folder, "NSUNSC.exe");
-                ProcessStartInfo startInfo = new ProcessStartInfo
-                {
-                    FileName = exePath,
-                    WorkingDirectory = Path.GetDirectoryName(exePath),
-                    UseShellExecute = true,
-                    CreateNoWindow = true
-                };
-                Process process = new Process { StartInfo = startInfo };
-                process.Start();
+                ProcessLauncher.RunDetached(exePath, Path.GetDirectoryName(exePath));
 
 
                 LoadingStatePlay = Visibility.Hidden;
@@ -7645,15 +7747,7 @@ namespace NSC_ModManager.ViewModel
                 //process.Start();
 
                 string exePath = Path.Combine(root_folder, "NSUNS4.exe");
-                ProcessStartInfo startInfo = new ProcessStartInfo
-                {
-                    FileName = exePath,
-                    WorkingDirectory = Path.GetDirectoryName(exePath),
-                    UseShellExecute = true,
-                    CreateNoWindow = true
-                };
-                Process process = new Process { StartInfo = startInfo };
-                process.Start();
+                ProcessLauncher.RunDetached(exePath, Path.GetDirectoryName(exePath));
 
 
                 LoadingStatePlay = Visibility.Hidden;
@@ -7780,7 +7874,7 @@ namespace NSC_ModManager.ViewModel
                     ExtractNus4(mod_path, InstallMod_folder);
                 } else
                 {
-                    System.IO.Compression.ZipFile.ExtractToDirectory(mod_path, InstallMod_folder);
+                    RepackHelper.ExtractZipSafe(mod_path, InstallMod_folder);
                 }
 
                 RefreshModList();
@@ -7824,7 +7918,7 @@ namespace NSC_ModManager.ViewModel
                     outFs.Write(fileData, offset, fileData.Length - offset);
                     outFs.Flush();
                 }
-                System.IO.Compression.ZipFile.ExtractToDirectory(tempZip, extractedTemp);
+                RepackHelper.ExtractZipSafe(tempZip, extractedTemp);
 
                 // --- create destination structure (do not extract into destination) ---
                 Directory.CreateDirectory(destinationFolder);

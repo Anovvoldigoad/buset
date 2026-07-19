@@ -71,7 +71,6 @@
             </Setter>
         </Style>
 
-        <Style TargetType="ToggleButton" BasedOn="{StaticResource NoChromeButton}"/>
         <Storyboard x:Key="ToS4">
             <DoubleAnimation Storyboard.TargetName="ModManagerGrid"
                      Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"

@@ -21,15 +21,6 @@
     <Prefer32Bit>false</Prefer32Bit>
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
-
-    <!--
-      Fix crash "Cannot find non-neutral culture related to 'en-us'" (XmlLanguage.GetSpecificCulture)
-      di Wine/Winlator: .NET butuh library ICU utk resolusi culture spesifik (en-US, dst), dan ICU
-      di Wine sering tidak lengkap/rusak. InvariantGlobalization=true membuat .NET tidak bergantung
-      ICU sama sekali (pakai invariant culture). Sistem lokalisasi kustom app ini (lang.xaml,
-      DynamicResource) TIDAK terpengaruh karena itu murni lookup resource XAML, bukan CultureInfo .NET.
-    -->
-    <InvariantGlobalization>true</InvariantGlobalization>
     
     <AssemblyVersion>2.0.0.2</AssemblyVersion>
     <FileVersion>2.0.0.2</FileVersion>

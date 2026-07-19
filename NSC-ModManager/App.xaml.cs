@@ -12,6 +12,7 @@ using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Markup;
 using System.Diagnostics;
 
 namespace NSC_ModManager
@@ -82,6 +83,35 @@ namespace NSC_ModManager
 
         public App()
         {
+            // ================================================================
+            // FIX UTAMA crash "Cannot find non-neutral culture related to 'en-us'"
+            // ================================================================
+            // Root cause sebenarnya: XmlLanguage.GetSpecificCulture() (dipanggil WPF
+            // untuk SETIAP Binding lewat BindingExpressionBase.GetCulture(), termasuk
+            // binding BitmapImage.UriSource di TitleView) butuh ENUMERASI seluruh locale
+            // terpasang (CultureInfo.GetCultures(CultureTypes.SpecificCultures)) untuk
+            // mencari padanan spesifik dari default Language="en-US" milik WPF. Enumerasi
+            // locale inilah yang tidak lengkap/rusak di Wine — BUKAN sekadar "ICU hilang"
+            // seperti dugaan awal.
+            //
+            // <InvariantGlobalization>true</InvariantGlobalization> (percobaan sebelumnya)
+            // JUSTRU MEMPERPARAH: di mode itu CultureInfo.GetCultures() SELALU kosong by
+            // design (didokumentasikan resmi Microsoft), jadi error ini malah DIJAMIN selalu
+            // terjadi, bukan cuma di Wine. Makanya setelah dipasang, crash-nya identik persis
+            // — bukan gagal fix, tapi fix yang salah arah. Sudah dikembalikan di csproj.
+            //
+            // Fix yang benar: override default Language jadi XmlLanguage.Empty. Berdasarkan
+            // dokumentasi resmi GetSpecificCulture(): "If this XmlLanguage is equal to
+            // XmlLanguage.Empty then this method will return CultureInfo.InvariantCulture" —
+            // artinya kalau Language di-set ke tag kosong, method itu LANGSUNG balikin
+            // InvariantCulture TANPA enumerasi locale sama sekali. Titik gagalnya dilewati
+            // total, bukan ditambal.
+            //
+            // WAJIB dipanggil sebelum InitializeComponent() / FrameworkElement pertama dibuat.
+            FrameworkElement.LanguageProperty.OverrideMetadata(
+                typeof(FrameworkElement),
+                new FrameworkPropertyMetadata(XmlLanguage.GetLanguage(string.Empty)));
+
             // Dipasang PALING AWAL, sebelum InitializeComponent, supaya menangkap
             // exception apa pun sedini mungkin di startup.
             //

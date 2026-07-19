@@ -78,15 +78,109 @@
         <Setter Property="CaretBrush" Value="{StaticResource App.Text}"/>
     </Style>
 
-    <!-- ===== ComboBox (style ringan, tetap pakai template default WPF) ===== -->
+    <!--
+      ComboBox: ControlTemplate PENUH, bukan Setter biasa.
+      Kenapa: template default ComboBox pakai chrome native
+      (Microsoft.Windows.Themes.ComboBoxChrome) yang di sesi debugging lain
+      terbukti memicu UriFormatException di Wine/Winlator (chrome native
+      itu resolve resource internal via URI yang gagal). Dengan template
+      penuh, TIDAK ADA chrome native yang dipakai sama sekali.
+      Internal ToggleButton diberi Style="{x:Null}" eksplisit supaya TIDAK
+      kena style implisit apa pun dari scope manapun (lihat juga: dead code
+      "<Style TargetType=ToggleButton BasedOn=NoChromeButton>" yang sudah
+      dihapus dari TitleView.xaml — kalau masih ada, ToggleButton internal
+      di sini bisa ketiban style yang salah base type-nya).
+    -->
     <Style TargetType="ComboBox">
         <Setter Property="Background" Value="{StaticResource App.Surface}"/>
         <Setter Property="Foreground" Value="{StaticResource App.Text}"/>
         <Setter Property="BorderBrush" Value="{StaticResource App.SurfaceEdge}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="6,4"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBox">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="22"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border x:Name="Bd" Grid.ColumnSpan="2"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"/>
+
+                        <ContentPresenter x:Name="ContentSite" Grid.Column="0"
+                                           Margin="{TemplateBinding Padding}"
+                                           VerticalAlignment="Center" HorizontalAlignment="Left"
+                                           IsHitTestVisible="False"
+                                           Content="{TemplateBinding SelectionBoxItem}"
+                                           ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                           ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"/>
+
+                        <Path x:Name="Arrow" Grid.Column="1" Data="M0,0 L4,4 L8,0 Z"
+                              Fill="{StaticResource App.Text}" HorizontalAlignment="Center"
+                              VerticalAlignment="Center" IsHitTestVisible="False"/>
+
+                        <!-- ToggleButton polos, Style di-null-kan eksplisit -->
+                        <ToggleButton x:Name="ToggleBtn" Grid.ColumnSpan="2"
+                                      Style="{x:Null}"
+                                      Background="Transparent" BorderThickness="0"
+                                      Focusable="False" ClickMode="Press"
+                                      IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="ToggleButton">
+                                    <Border Background="{TemplateBinding Background}"/>
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
+
+                        <Popup x:Name="Popup" Placement="Bottom"
+                               IsOpen="{TemplateBinding IsDropDownOpen}"
+                               AllowsTransparency="True" Focusable="False"
+                               PopupAnimation="None">
+                            <Border Background="{StaticResource App.Surface}"
+                                    BorderBrush="{StaticResource App.SurfaceEdge}"
+                                    BorderThickness="1"
+                                    MinWidth="{TemplateBinding ActualWidth}"
+                                    MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                <ScrollViewer CanContentScroll="True">
+                                    <ItemsPresenter/>
+                                </ScrollViewer>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource App.Accent}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.5"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
     <Style TargetType="ComboBoxItem">
         <Setter Property="Background" Value="{StaticResource App.Surface}"/>
         <Setter Property="Foreground" Value="{StaticResource App.Text}"/>
+        <Setter Property="Padding" Value="6,3"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBoxItem">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource App.Accent}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!-- ===== CheckBox (dipakai sebagai pengganti ui:ToggleSwitch) ===== -->
@@ -94,9 +188,132 @@
         <Setter Property="Foreground" Value="{StaticResource App.Text}"/>
     </Style>
 
-    <!-- ===== ScrollViewer / ScrollBar dasar (tanpa efek fancy) ===== -->
+    <!--
+      ScrollBar: ControlTemplate penuh (hindari chrome native ScrollChrome).
+      Preventif — belum ada bukti crash langsung dari ini di repo kita, tapi
+      kelas bug yang sama (native Themes chrome) sudah terbukti di ComboBox/
+      DataGridColumnHeader/Menu di sesi debugging lain, dan ScrollBar/
+      ScrollViewer implisit dipakai hampir di semua ListBox/panel yang
+      kontennya lebih panjang dari layar.
+    -->
+    <Style TargetType="RepeatButton" x:Key="ScrollRepeatButton">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RepeatButton">
+                    <Border Background="Transparent"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style TargetType="Thumb" x:Key="ScrollThumb">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Border Background="{StaticResource App.SurfaceEdge}" CornerRadius="3"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
     <Style TargetType="ScrollBar">
         <Setter Property="Background" Value="{StaticResource App.Surface}"/>
+        <Setter Property="Width" Value="12"/>
+        <Setter Property="MinWidth" Value="12"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollBar">
+                    <Grid Background="{TemplateBinding Background}">
+                        <Track x:Name="PART_Track" IsDirectionReversed="True">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource ScrollRepeatButton}" Command="ScrollBar.PageUpCommand"/>
+                            </Track.DecreaseRepeatButton>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource ScrollRepeatButton}" Command="ScrollBar.PageDownCommand"/>
+                            </Track.IncreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb Style="{StaticResource ScrollThumb}" Width="8"/>
+                            </Track.Thumb>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+      Menu / MenuItem: ControlTemplate penuh untuk semua Role
+      (TopLevelHeader/TopLevelItem/SubmenuHeader/SubmenuItem). Menu default
+      WPF pakai chrome native (Microsoft.Windows.Themes.ClassicBorderDecorator
+      / SystemDropShadowChrome) untuk border top-level & shadow popup submenu
+      — chrome inilah yang terbukti memicu NullReferenceException di
+      MeasureOverride-nya saat dijalankan di Wine/Winlator (kelas bug sama
+      dengan ComboBoxChrome/DataGridHeaderBorder). TitleView.xaml punya
+      <Menu> beneran dengan submenu, jadi ini bukan style preventif kosong.
+    -->
+    <Style TargetType="Menu">
+        <Setter Property="Background" Value="{StaticResource App.Bg}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Menu">
+                    <Border Background="{TemplateBinding Background}">
+                        <ItemsPresenter/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="MenuItem">
+        <Setter Property="Foreground" Value="{StaticResource App.Text}"/>
+        <Setter Property="Padding" Value="8,4"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Grid x:Name="Root">
+                        <!-- Header (dipakai TopLevelHeader/TopLevelItem/SubmenuHeader/SubmenuItem) -->
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                BorderBrush="{StaticResource App.SurfaceEdge}" BorderThickness="0">
+                            <Grid Margin="{TemplateBinding Padding}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ContentPresenter Grid.Column="0" ContentSource="Header"
+                                                   RecognizesAccessKey="True"
+                                                   VerticalAlignment="Center"/>
+                                <Path x:Name="SubmenuArrow" Grid.Column="1" Data="M0,0 L4,4 L0,8 Z"
+                                      Fill="{StaticResource App.Text}" Margin="8,0,0,0"
+                                      VerticalAlignment="Center" Visibility="Collapsed"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Popup submenu (dipakai kalau MenuItem ini punya child MenuItem) -->
+                        <Popup x:Name="Popup" Placement="Bottom" AllowsTransparency="True"
+                               IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                               Focusable="False" PopupAnimation="None">
+                            <Border Background="{StaticResource App.Surface}"
+                                    BorderBrush="{StaticResource App.SurfaceEdge}" BorderThickness="1">
+                                <StackPanel IsItemsHost="True" Orientation="Vertical"/>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource App.Accent}"/>
+                        </Trigger>
+                        <Trigger Property="Role" Value="SubmenuHeader">
+                            <Setter Property="Placement" TargetName="Popup" Value="Right"/>
+                            <Setter TargetName="SubmenuArrow" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="Role" Value="TopLevelHeader">
+                            <Setter Property="Placement" TargetName="Popup" Value="Bottom"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.5"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
 </ResourceDictionary>
