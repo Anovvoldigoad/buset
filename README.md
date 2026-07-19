@@ -28,6 +28,19 @@ Repo ini berisi dua proyek sebagai sibling folder (dibutuhkan oleh `ProjectRefer
 | 14 | Hapus paket NuGet: `ModernWpfUI`, `ModernWpf.MessageBox`, `WindowsAPICodePack-Shell`, `NodeNetwork`, `NodeNetworkToolkit` | `NSC-ModManager.csproj` |
 | 15 | **[Fix build #1]** Kembalikan `DynamicData` sebagai direct `PackageReference` (v9.4.1) — dipakai langsung di 18 file `Model`/`ViewModel`/`View`, kemarin cuma nebeng transitif lewat `NodeNetworkToolkit` dan sempat ikut hilang | `NSC-ModManager.csproj` |
 | 16 | **[Fix build #2]** `XFBIN_LIB-main.zip` yang di-upload ternyata versi LEBIH LAMA dari yang dibutuhkan `NUS3BANKViewModel.cs` (bug pra-existing, bukan dari migrasi UI). Tambah `XFBIN_READER.FindChunks`/`FoundChunk` dan `XFBIN_WRITER.RepackXfbinData`/`ChangeChunkNameAndPath` — semua dibangun ulang memakai rantai resolusi index & rumus penghitungan ukuran section yang **sudah ada dan terbukti benar** di `ReadXFBIN`/`ReadDirectoryXFBIN`/`RepackXFBIN`, bukan logika baru yang ditebak | `XFBIN_LIB/XFBIN_READER.cs`, `XFBIN_LIB/XFBIN_WRITER.cs` |
+| 17 | **[Fix runtime]** App hang di Winlator (Arm64EC+FEXCore): proses jalan (CPU terpakai) tapi window tidak pernah muncul. Diagnosis: CoreCLR .NET 6+ pakai proteksi memori JIT **W^X** (mprotect RW↔RX bolak-balik tiap JIT compile), yang deadlock dengan translation cache FEXCore/Box64/QEMU-user — pola ini sudah dikenal luas di komunitas emulasi. Fix: `DOTNET_EnableWriteXorExecute=0` lewat launcher | `NSC-ModManager/Launch-Winlator.bat` (baru) |
+
+### Cara pakai launcher di Winlator
+
+**Jangan jalankan `NSC_ModManager.exe` langsung** dari Winlator. Arahkan shortcut/launcher Winlator ke **`Launch-Winlator.bat`** (ada di folder hasil publish yang sama dengan exe-nya) — file ini men-set `DOTNET_EnableWriteXorExecute=0` dulu sebelum menjalankan exe utama, supaya CoreCLR tidak deadlock lawan FEXCore.
+
+Kalau setelah pakai launcher ini masih hang, coba aktifkan (hapus `REM` di depan baris) satu per satu secara bertahap di `Launch-Winlator.bat`, dari yang paling ringan dampaknya dulu:
+1. `DOTNET_TieredPGO=0` — matikan profiling JIT tier kedua (thread background tambahan)
+2. `DOTNET_TC_QuickJitForLoops=0` — matikan quick-JIT khusus loop
+3. `DOTNET_gcServer=0` — paksa Workstation GC (lebih ringan, kurang multi-thread) kalau ternyata Server GC aktif
+
+Kalau semua kombinasi di atas tetap hang, kemungkinan besar bukan lagi soal konfigurasi runtime, tapi FEXCore versi yang dipakai memang belum kompatibel penuh dengan CoreCLR .NET 8 — coba bandingkan dengan container **Arm64EC + WowBox64** sebagai alternatif (beda jalur emulasi, kadang hasilnya beda untuk kasus JIT-heavy seperti .NET).
+
 
 **Yang TIDAK disentuh sama sekali** (sesuai permintaan awal): `Model/*.cs`, seluruh logic parsing di `ViewModel/*.cs` (di luar baris dialog/MessageBox yang disebut eksplisit di atas), `XfbinParser.cs`, `BinaryReader.cs`, `Converter/*.cs`, `Controls/KuramaControl.xaml`/`LoadingControl.xaml` (memang tidak pernah pakai ModernWpf), seluruh proyek `XFBIN_LIB`.
 

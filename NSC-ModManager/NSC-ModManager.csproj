@@ -178,6 +178,12 @@
     </BootstrapperPackage>
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Launch-Winlator.bat">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\XFBIN_LIB\XFBIN_LIB.csproj" />
   </ItemGroup>
 </Project>
