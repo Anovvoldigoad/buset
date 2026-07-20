@@ -17,11 +17,23 @@ REM ============================================================
 
 set DOTNET_EnableWriteXorExecute=0
 
-REM Fix crash "Cannot find non-neutral culture related to 'en-us'" (ICU tidak
-REM tersedia/rusak di Wine). Sudah di-bake permanen lewat <InvariantGlobalization>
-REM di csproj, baris ini cuma jaring pengaman kalau exe kebetulan dijalankan
-REM tanpa lewat launcher ini.
-set DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
+REM ------------------------------------------------------------------
+REM  DOTNET_SYSTEM_GLOBALIZATION_INVARIANT SENGAJA DIHAPUS DARI SINI.
+REM  Riwayat: sempat dicoba sebagai fix untuk "Cannot find non-neutral
+REM  culture" (lihat README poin #19), lalu csproj-nya sudah direvert
+REM  karena teorinya salah arah — TAPI baris env var di launcher ini
+REM  kelewat kehapus, jadi Invariant Globalization tetap aktif diam-diam
+REM  di semua percobaan berikutnya lewat launcher ini.
+REM
+REM  Ternyata WPF SAMA SEKALI TIDAK BISA jalan di Invariant Globalization
+REM  Mode: subsistem font/text-rendering-nya sendiri (MS.Internal.FontCache.
+REM  MajorLanguages) hardcode manggil `new CultureInfo("en")` di static
+REM  constructor-nya, yang PASTI throw CultureNotFoundException di mode
+REM  invariant (cuma invariant culture "" yang valid di mode itu). Crash ini
+REM  muncul begitu ada TextBlock APAPUN yang di-render — jadi fatal total,
+REM  bukan soal satu Binding tertentu lagi.
+REM  JANGAN AKTIFKAN LAGI ENV VAR INI UNTUK APLIKASI WPF.
+REM ------------------------------------------------------------------
 
 REM Cadangan tambahan (aktifkan/hapus REM salah satu baris di bawah
 REM kalau langkah di atas SAJA belum cukup menyelesaikan hang):
