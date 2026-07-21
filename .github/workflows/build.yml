@@ -14,6 +14,10 @@ on:
 env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
+  # Lapis 1: paksa false di level environment CI, jaga-jaga kalau runner
+  # windows-latest punya default implisit yang mengaktifkan invariant mode.
+  # WPF TIDAK BISA JALAN SAMA SEKALI di mode ini (lihat komentar di .csproj).
+  DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: 'false'
 
 jobs:
   build:
@@ -36,6 +40,7 @@ jobs:
           dotnet build NSC-ModManager/NSC-ModManager.csproj
           -c Release
           -p:Platform=x64
+          -p:InvariantGlobalization=false
           --no-restore
 
       - name: Publish (self-contained, single folder, x64)
@@ -44,9 +49,25 @@ jobs:
           -c Release
           -r win-x64
           -p:Platform=x64
+          -p:InvariantGlobalization=false
           --self-contained true
           -p:PublishSingleFile=false
           -o publish/NSC-ModManager-win-x64
+
+      - name: Verifikasi runtimeconfig.json (InvariantGlobalization HARUS false/absen)
+        shell: pwsh
+        run: |
+          $cfgPath = "publish/NSC-ModManager-win-x64/NSC_ModManager.runtimeconfig.json"
+          Write-Host "=== Isi $cfgPath ==="
+          Get-Content $cfgPath | Write-Host
+          $cfg = Get-Content $cfgPath -Raw | ConvertFrom-Json
+          $invariant = $cfg.runtimeOptions.configProperties.'System.Globalization.Invariant'
+          if ($invariant -eq $true) {
+            Write-Error "GAGAL: System.Globalization.Invariant = true di runtimeconfig.json hasil publish! WPF tidak akan bisa jalan (crash MS.Internal.FontCache.MajorLanguages). Build dihentikan supaya tidak menghasilkan artifact yang pasti crash."
+            exit 1
+          } else {
+            Write-Host "OK: System.Globalization.Invariant tidak true (nilai: $invariant)"
+          }
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

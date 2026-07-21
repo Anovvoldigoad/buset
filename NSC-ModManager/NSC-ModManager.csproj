@@ -21,6 +21,23 @@
     <Prefer32Bit>false</Prefer32Bit>
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
+
+    <!--
+      EKSPLISIT false, BUKAN cuma dihilangkan/absen. Ditemukan bahwa .NET 8 SDK
+      punya kebiasaan diam-diam mengaktifkan InvariantGlobalization=true di
+      berbagai skenario proyek tanpa terdokumentasi jelas (lihat laporan resmi:
+      github.com/dotnet/aspnetcore/issues/52319 — developer lain mengalami hal
+      identik, InvariantGlobalization=true muncul begitu saja padahal tidak
+      pernah ditulis sendiri). WPF TIDAK BISA JALAN SAMA SEKALI di mode itu —
+      MS.Internal.FontCache.MajorLanguages (subsistem font WPF) hardcode
+      `new CultureInfo("en")` di static constructor-nya, pasti crash begitu
+      ada TextBlock apa pun dirender. "Absen dari csproj" ternyata TIDAK CUKUP
+      untuk memastikan mode ini mati — harus dipaksa false eksplisit di sini,
+      DAN dipaksa lagi lewat -p:InvariantGlobalization=false di workflow
+      GitHub Actions (lihat build.yml) sebagai lapis kedua, supaya default
+      implisit apa pun dari SDK/runner CI tidak bisa menang.
+    -->
+    <InvariantGlobalization>false</InvariantGlobalization>
     
     <AssemblyVersion>2.0.0.2</AssemblyVersion>
     <FileVersion>2.0.0.2</FileVersion>

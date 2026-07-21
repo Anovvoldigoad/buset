@@ -84,6 +84,43 @@ namespace NSC_ModManager
         public App()
         {
             // ================================================================
+            // SELF-CHECK: pastikan Invariant Globalization Mode BENAR-BENAR mati
+            // ================================================================
+            // .NET 8 SDK terbukti (github.com/dotnet/aspnetcore/issues/52319)
+            // bisa diam-diam mengaktifkan InvariantGlobalization=true tanpa
+            // pernah ditulis eksplisit di manapun. Kita sudah paksa false di 3
+            // lapis (csproj, MSBuild property saat build, workflow env var) —
+            // tapi kalau ENTAH BAGAIMANA masih ke-trigger dari sumber lain yang
+            // belum ketahuan, mending ketahuan di sini dengan pesan jelas,
+            // daripada nyasar jadi crash "MS.Internal.FontCache.MajorLanguages"
+            // yang membingungkan dan seolah-olah bug WPF acak.
+            try
+            {
+                _ = new System.Globalization.CultureInfo("en");
+            } catch (System.Globalization.CultureNotFoundException)
+            {
+                try
+                {
+                    System.Windows.MessageBox.Show(
+                        "FATAL: Invariant Globalization Mode masih aktif meski sudah " +
+                        "dipaksa false di csproj & workflow build. WPF TIDAK BISA jalan " +
+                        "sama sekali di mode ini.\n\n" +
+                        "Ini bukan bug biasa — kemungkinan ada env var " +
+                        "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 yang masih ter-set di " +
+                        "level OS/container Winlator itu sendiri (bukan dari aplikasi " +
+                        "ini), atau ada runtimeconfig.json basi dari build lama yang " +
+                        "belum ke-replace.\n\n" +
+                        "Cek: 1) hapus total folder lama, extract ulang dari zip terbaru. " +
+                        "2) pastikan tidak ada env var DOTNET_SYSTEM_GLOBALIZATION_INVARIANT " +
+                        "di pengaturan container Winlator.",
+                        "NSC Mod Manager - Invariant Globalization masih aktif",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                } catch { }
+                Environment.Exit(1);
+                return;
+            }
+
+            // ================================================================
             // FIX UTAMA crash "Cannot find non-neutral culture related to 'en-us'"
             // ================================================================
             // Root cause sebenarnya: XmlLanguage.GetSpecificCulture() (dipanggil WPF
