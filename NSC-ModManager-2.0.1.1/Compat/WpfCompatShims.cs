@@ -310,3 +310,32 @@ namespace System.Windows.Media.Imaging
         }
     }
 }
+
+namespace System.Windows.Media.Animation
+{
+    /// <summary>
+    /// Drop-in replacement for WPF's System.Windows.Media.Animation.RepeatBehavior,
+    /// used by TitleViewModel.MeouchEffectRepeat (a cosmetic effect-repeat setting).
+    /// Only the two members actually used are implemented: the Forever static
+    /// property and the double-count constructor.
+    /// </summary>
+    public struct RepeatBehavior
+    {
+        public double Count { get; }
+        public bool IsForever { get; }
+
+        public RepeatBehavior(double count)
+        {
+            Count = count;
+            IsForever = false;
+        }
+
+        private RepeatBehavior(bool forever)
+        {
+            Count = 0;
+            IsForever = forever;
+        }
+
+        public static RepeatBehavior Forever => new RepeatBehavior(true);
+    }
+}
