@@ -275,6 +275,20 @@ namespace XFBIN_LIB
         {
             XFBIN.XFBIN xfbin_file = XFBIN_WRITER.ReadDirectoryXFBIN(path);
             string outputFile = Path.Combine(Path.GetDirectoryName(path), Path.GetFileName(path) + ".xfbin");
+            RepackXfbinData(xfbin_file, outputFile);
+        }
+
+        /// <summary>
+        /// Writes an already-parsed (and possibly already-modified in memory, e.g.
+        /// via XFBIN_READER.FindChunks then mutating .ChunkData directly) XFBIN.XFBIN
+        /// straight out to outputFile. This is the same byte-for-byte write sequence
+        /// RepackXFBIN(path) already used internally -- factored out here so callers
+        /// that already have an in-memory XFBIN (instead of an unpacked directory of
+        /// loose JSON/chunk files) can write it back out without a round-trip through
+        /// disk.
+        /// </summary>
+        public static void RepackXfbinData(XFBIN.XFBIN xfbin_file, string outputFile)
+        {
             if (File.Exists(outputFile))
             {
                 File.Delete(outputFile);
@@ -358,6 +372,52 @@ namespace XFBIN_LIB
                 }
             }
         }
+
+        /// <summary>
+        /// Retargets the FILE_PATH/CHUNK_NAME table entries associated (via the
+        /// CHUNK_MAP the given chunk name resolves to) with an existing chunk to
+        /// newPath/newName. Used by NUS3BANKViewModel when re-pointing a replaced
+        /// audio chunk at a new in-game path/name before repacking.
+        /// Note: if multiple chunks happen to share the same ChunkMap entry (same
+        /// name+path pair), this updates the shared entry for all of them -- for the
+        /// single-chunk NUS3BANK replacement flow this method is written for, that's
+        /// the intended behavior.
+        /// </summary>
+        public static void ChangeChunkNameAndPath(XFBIN.XFBIN xfbin_file, string chunkName, string newPath, string newName)
+        {
+            var chunkTable = xfbin_file.ChunkTable;
+
+            int nameIndex = -1;
+            for (int i = 0; i < chunkTable.ChunkNames.Count; i++)
+            {
+                if (chunkTable.ChunkNames[i].ChunkName == chunkName)
+                {
+                    nameIndex = i;
+                    break;
+                }
+            }
+            if (nameIndex < 0)
+                return;
+
+            CHUNK_MAP targetMap = null;
+            foreach (var map in chunkTable.ChunkMaps)
+            {
+                if ((int)map.ChunkNameIndex == nameIndex)
+                {
+                    targetMap = map;
+                    break;
+                }
+            }
+            if (targetMap == null)
+                return;
+
+            chunkTable.ChunkNames[nameIndex].ChunkName = newName;
+
+            int pathIndex = (int)targetMap.FilePathIndex;
+            if (pathIndex >= 0 && pathIndex < chunkTable.FilePaths.Count)
+                chunkTable.FilePaths[pathIndex].FilePathName = newPath;
+        }
+
 
 
 

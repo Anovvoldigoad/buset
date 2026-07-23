@@ -7,6 +7,57 @@ namespace XFBIN_LIB
     public class XFBIN_READER
     {
         public XFBIN.XFBIN XfbinFile = new XFBIN.XFBIN();
+
+        /// <summary>A chunk located by FindChunks, together with the page it lives on
+        /// and its resolved name (looked up via the chunk's ChunkMap -> ChunkName
+        /// table entry), since callers need both to later locate/rewrite it.</summary>
+        public struct FoundChunk
+        {
+            public XFBIN_LIB.XFBIN.PAGE Page;
+            public XFBIN_LIB.XFBIN.CHUNK Chunk;
+            public string ChunkName;
+        }
+
+        /// <summary>
+        /// Searches every page's chunks for ones whose resolved chunk-type name
+        /// (via CHUNK.ChunkMapIndex -> ChunkTable.ChunkMaps[i].ChunkTypeIndex ->
+        /// ChunkTable.ChunkTypes[i].ChunkTypeName) matches chunkTypeName, e.g.
+        /// "nuccChunkNub" or "nuccChunkBinary". Requires ReadXFBIN to have been
+        /// called first so XfbinFile is populated.
+        /// </summary>
+        public List<FoundChunk> FindChunks(string chunkTypeName)
+        {
+            var results = new List<FoundChunk>();
+            if (XfbinFile?.Pages == null || XfbinFile.ChunkTable == null)
+                return results;
+
+            foreach (var page in XfbinFile.Pages)
+            {
+                foreach (var chunk in page.Chunks)
+                {
+                    int mapIndex = (int)chunk.ChunkMapIndex;
+                    if (mapIndex < 0 || mapIndex >= XfbinFile.ChunkTable.ChunkMaps.Count)
+                        continue;
+                    var map = XfbinFile.ChunkTable.ChunkMaps[mapIndex];
+
+                    int typeIndex = (int)map.ChunkTypeIndex;
+                    if (typeIndex < 0 || typeIndex >= XfbinFile.ChunkTable.ChunkTypes.Count)
+                        continue;
+                    string typeName = XfbinFile.ChunkTable.ChunkTypes[typeIndex].ChunkTypeName;
+
+                    if (typeName == chunkTypeName)
+                    {
+                        int nameIndex = (int)map.ChunkNameIndex;
+                        string chunkName = (nameIndex >= 0 && nameIndex < XfbinFile.ChunkTable.ChunkNames.Count)
+                            ? XfbinFile.ChunkTable.ChunkNames[nameIndex].ChunkName
+                            : null;
+
+                        results.Add(new FoundChunk { Page = page, Chunk = chunk, ChunkName = chunkName });
+                    }
+                }
+            }
+            return results;
+        }
         public void ReadXFBIN(string path = "")
         {
             XfbinFile = new XFBIN.XFBIN();

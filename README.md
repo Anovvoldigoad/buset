@@ -83,5 +83,23 @@ to install one. WinForms itself doesn't have that restriction (no XAML build
 step), so the GitHub Actions run above is the first real compiler check this
 code gets. If it reports errors, paste them back and they'll get fixed.
 
+## Update log
+
+- **First CI run**: 2 errors (missing `DynamicData` package reference lost as
+  a side effect of removing `NodeNetworkToolkit`; a missed `RepeatBehavior`
+  usage in `TitleViewModel.cs`). Both fixed.
+- **Second CI run**: 754 raw error lines, 3 real root causes: (1) the new
+  `Program.cs` entry-point class shadowed a pre-existing
+  `NSC_ModManager.Properties.Program` utility class ~40 ViewModels depend on
+  for static data lists — renamed to `EntryPoint`; (2) ~280 call sites use
+  `App.Current.Dispatcher...` (the WPF-era `App : Application` subclass
+  specifically, not just `Application.Current`) — restored as a minimal `App.cs`;
+  (3) **`XFBIN_LIB` itself was an older/mismatched version** — `NUS3BANKViewModel.cs`
+  calls `XFBIN_READER.FindChunks`/`XFBIN_WRITER.RepackXfbinData`/
+  `ChangeChunkNameAndPath`, none of which existed in the uploaded `XFBIN_LIB-main`
+  source. These were added to `XFBIN_LIB` directly (not shimmed) based on the
+  existing page/chunk/chunk-table data model and the byte-writing logic already
+  present in `RepackXFBIN`. See the `nsc-modmanager-winlator` skill for full detail.
+
 See the `nsc-modmanager-winlator` skill for the full diagnosis history (the
 original ModernWpf/WinRT crash) leading up to this rewrite.

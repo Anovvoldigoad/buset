@@ -8,7 +8,10 @@ using NSC_ModManager.View;
 
 namespace NSC_ModManager
 {
-    internal static class Program
+    // Named EntryPoint rather than "Program" because this project already has a
+    // NSC_ModManager.Properties.Program class (CpkMaker/YaCpkTool + static data
+    // lists many ViewModels reference by short name); a Program here would shadow it.
+    internal static class EntryPoint
     {
         [DllImport("kernel32", SetLastError = true, CharSet = CharSet.Unicode)]
         private static extern IntPtr LoadLibrary(string lpFileName);
