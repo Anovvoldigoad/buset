@@ -116,7 +116,7 @@ namespace System.Windows
     /// .Dispatcher.Invoke(...)/.CheckAccess() (UI-thread marshaling).
     /// Wired up once from Program.cs at startup.
     /// </summary>
-    public sealed class Application
+    public class Application
     {
         private static Application _current;
         public static Application Current => _current ??= new Application();
