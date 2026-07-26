@@ -1014,7 +1014,17 @@ namespace NSC_ModManager.ViewModel
             CPKList = new ObservableCollection<string>();
             ShaderList = new ObservableCollection<string>();
             RefreshModList();
-            CheckGitHubNewerVersion();
+            // CheckGitHubNewerVersion() removed from automatic startup: it needs
+            // HttpClient, which needs ws2_32/crypt32/sspicli/System.IO.Compression.Native
+            // (gzip response decompression) -- all of which fail to load under
+            // Winlator/Wine per the 2026-07-27 crash log (STATUS_DLL_NOT_FOUND for
+            // each), triggering a native access violation during CoreCLR's own
+            // fail-fast handling. That kind of native-level fault isn't reliably
+            // catchable with an ordinary try/catch around the call (unlike a normal
+            // managed exception), so the safest fix is to just not make the network
+            // call automatically. The method itself (CheckGitHubNewerVersion, below)
+            // is left in place in case it's ever wired back up to a manual "Check for
+            // updates" button instead of an automatic startup call.
         }
         private bool TryReadCSPConfig(string rootPath, string cspCode, out int page, out int slot, out int costume)
         {
@@ -1186,26 +1196,35 @@ namespace NSC_ModManager.ViewModel
         }
         private async System.Threading.Tasks.Task CheckGitHubNewerVersion()
         {
-            //Get all releases from GitHub
-            //Source: https://octokitnet.readthedocs.io/en/latest/getting-started/
-            GitHubClient client = new GitHubClient(new Octokit.ProductHeaderValue("NSC-ModManager"));
-            IReadOnlyList<Release> releases = await client.Repository.Release.GetAll("TheLeonX", "NSC-ModManager");
-
-            //Setup the versions
-            //Source: https://learn.microsoft.com/en-us/archive/msdn-technet-forums/7fe34424-0a53-46cb-b4b3-ab63b0823d01
-            Version latestGitHubVersion = new Version(releases[0].TagName);
-            System.Reflection.Assembly assembly = System.Reflection.Assembly.GetExecutingAssembly();
-            Version localVersion = assembly.GetName().Version;
-
-            //Compare the Versions
-            //Source: https://stackoverflow.com/questions/7568147/compare-version-numbers-without-using-split-function
-            int versionComparison = localVersion.CompareTo(latestGitHubVersion);
-            if (versionComparison < 0)
+            try
             {
-                SystemSounds.Beep.Play();
-                System.Windows.MessageBox.Show("There is new version of Mod Manager on GitHub page.");
-            }
+                //Get all releases from GitHub
+                //Source: https://octokitnet.readthedocs.io/en/latest/getting-started/
+                GitHubClient client = new GitHubClient(new Octokit.ProductHeaderValue("NSC-ModManager"));
+                IReadOnlyList<Release> releases = await client.Repository.Release.GetAll("TheLeonX", "NSC-ModManager");
 
+                //Setup the versions
+                //Source: https://learn.microsoft.com/en-us/archive/msdn-technet-forums/7fe34424-0a53-46cb-b4b3-ab63b0823d01
+                Version latestGitHubVersion = new Version(releases[0].TagName);
+                System.Reflection.Assembly assembly = System.Reflection.Assembly.GetExecutingAssembly();
+                Version localVersion = assembly.GetName().Version;
+
+                //Compare the Versions
+                //Source: https://stackoverflow.com/questions/7568147/compare-version-numbers-without-using-split-function
+                int versionComparison = localVersion.CompareTo(latestGitHubVersion);
+                if (versionComparison < 0)
+                {
+                    SystemSounds.Beep.Play();
+                    System.Windows.MessageBox.Show("There is new version of Mod Manager on GitHub page.");
+                }
+            }
+            catch
+            {
+                // Update-check failures (no network, TLS/socket/compression stack not
+                // available in this environment, GitHub API unreachable, etc.) should
+                // never block or crash the app -- this is a nice-to-have, not core
+                // functionality.
+            }
         }
         public void RefreshModList()
         {
