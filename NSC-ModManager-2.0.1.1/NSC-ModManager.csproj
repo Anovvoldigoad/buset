@@ -78,33 +78,89 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="Resources\Fonts\Storm4_rus.ttf">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </Resource>
-    <Resource Include="Resources\Styles\UI\background\bg_toolbox_main.png">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </Resource>
-    <Resource Include="Resources\Styles\UI\background\wizard_background_1.png" />
-    <Resource Include="Resources\Styles\UI\charsel\pt_brank_emp.png" />
-    <Resource Include="Resources\Styles\UI\charsel\s_brt5.png" />
-    <Resource Include="Resources\Styles\UI\kurama\dialog_name_background.png" />
-    <Resource Include="Resources\Styles\UI\kurama\kurama_body.png" />
-    <Resource Include="Resources\Styles\UI\kurama\kurama_tail_1.png" />
-    <Resource Include="Resources\Styles\UI\kurama\kurama_tail_2.png" />
-    <Resource Include="Resources\Styles\UI\kurama\kurama_tail_3.png" />
-    <Resource Include="Resources\Styles\UI\kurama\kurama_tail_4.png" />
-    <Resource Include="Resources\Styles\UI\kurama\meouch_appear_effect.gif" />
-    <Resource Include="Resources\Styles\UI\kurama\meouch_body.png" />
-    <Resource Include="Resources\Styles\UI\loading\toolbox_load_1.png" />
-    <Resource Include="Resources\Styles\UI\loading\toolbox_load_2.png" />
-    <Resource Include="Resources\Styles\UI\logo\modmanager_logo.png" />
-    <Resource Include="Resources\Styles\UI\logo\modmanager_logo_S4.png" />
-    <Resource Include="Resources\Styles\UI\logo\NS4.png" />
-    <Resource Include="Resources\Styles\UI\logo\NSC.png" />
-    <Resource Include="Resources\Styles\UI\logo\toolbox_logo.png">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </Resource>
+    <!-- These were WPF Resource items (embed-into-assembly, accessed via pack:// URIs).
+         Without UseWPF there's no PresentationFramework to resolve pack:// URIs
+         anyway, and this codebase's WinForms code (KuramaControl, etc.) reads these
+         as plain files from disk (Image.FromFile(...)), so they need to be actual
+         loose files next to the exe; that's what Content + CopyToOutputDirectory
+         gives us, unlike the old Resource item type. -->
+    <Content Include="Resources\Fonts\Storm4_rus.ttf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Styles\UI\background\bg_toolbox_main.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Styles\UI\background\wizard_background_1.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Styles\UI\charsel\pt_brank_emp.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Styles\UI\charsel\s_brt5.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Styles\UI\kurama\dialog_name_background.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Styles\UI\kurama\kurama_body.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Styles\UI\kurama\kurama_tail_1.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Styles\UI\kurama\kurama_tail_2.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Styles\UI\kurama\kurama_tail_3.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Styles\UI\kurama\kurama_tail_4.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Styles\UI\kurama\meouch_appear_effect.gif">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Styles\UI\kurama\meouch_body.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Styles\UI\loading\toolbox_load_1.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Styles\UI\loading\toolbox_load_2.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Styles\UI\logo\modmanager_logo.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Styles\UI\logo\modmanager_logo_S4.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Styles\UI\logo\NS4.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Styles\UI\logo\NSC.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Styles\UI\logo\toolbox_logo.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- Never had ANY declaration at all after WPF's implicit "Page" auto-globbing
+         (which used to pick up every .xaml file automatically) went away with
+         UseWPF; this is the direct cause of every [[missing:key]] string in the
+         UI, since Compat/LocalizationLoader.cs reads this file from disk at
+         startup and silently no-ops if it isn't there. Uses "Update" (not
+         "Include") like the other loose-file-copy entries below (vcredist_x86.exe,
+         Settings.settings, etc.) since the SDK's default globbing already picks
+         this file up implicitly as a None item; Update just adds the copy
+         instruction instead of creating a second, duplicate item for it. -->
+    <None Update="Resources\Localization\lang.xaml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 
   <ItemGroup>
     <PackageReference Include="DynamicData" Version="7.14.2" />
