@@ -6,6 +6,12 @@
     <RootNamespace>NSC_ModManager</RootNamespace>
     <AssemblyName>NSC_ModManager</AssemblyName>
     <Nullable>enable</Nullable>
+    <!-- CS0436: Microsoft.WindowsDesktop.App still exposes real PresentationFramework/
+         PresentationCore types (Visibility, MessageBox, RepeatBehavior, etc.) even with
+         UseWPF=false, so our same-named Compat/ shims "conflict" with them by name.
+         Roslyn already resolves every such conflict in favor of our shim (the whole
+         point of them); this only silences the resulting ~2700 duplicate notices. -->
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationIcon>white_MM.ico</ApplicationIcon>
 

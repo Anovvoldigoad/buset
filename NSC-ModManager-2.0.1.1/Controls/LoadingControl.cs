@@ -16,6 +16,8 @@ namespace NSC_ModManager.Controls
         private readonly System.Windows.Forms.Timer _timer;
         private float _angle;
 
+        [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+        [System.ComponentModel.Browsable(false)]
         public System.Windows.Visibility LoadingState
         {
             get => _loadingState;
