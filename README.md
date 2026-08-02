@@ -94,12 +94,46 @@ code gets. If it reports errors, paste them back and they'll get fixed.
   for static data lists — renamed to `EntryPoint`; (2) ~280 call sites use
   `App.Current.Dispatcher...` (the WPF-era `App : Application` subclass
   specifically, not just `Application.Current`) — restored as a minimal `App.cs`;
-  (3) **`XFBIN_LIB` itself was an older/mismatched version** — `NUS3BANKViewModel.cs`
+  (3) `XFBIN_LIB` itself was an older/mismatched version — `NUS3BANKViewModel.cs`
   calls `XFBIN_READER.FindChunks`/`XFBIN_WRITER.RepackXfbinData`/
   `ChangeChunkNameAndPath`, none of which existed in the uploaded `XFBIN_LIB-main`
-  source. These were added to `XFBIN_LIB` directly (not shimmed) based on the
-  existing page/chunk/chunk-table data model and the byte-writing logic already
-  present in `RepackXFBIN`. See the `nsc-modmanager-winlator` skill for full detail.
+  source. **Superseded** by the pre-built DLL swap below.
+- **Third CI run**: `CS0509` -- the `Application` shim was `sealed`, but `App`
+  needed to inherit from it. Fixed.
+- **Fourth CI run**: `WFO1000` (WinForms designer-serialization analyzer) on
+  `LoadingControl.LoadingState`; fixed with `[DesignerSerializationVisibility]`.
+  The ~2700 accompanying warnings were all benign `CS0436` (WPF types still
+  technically linkable via `Microsoft.WindowsDesktop.App` even with
+  `UseWPF=false`; Roslyn already resolves in our shims' favor every time) --
+  silenced via `<NoWarn>`.
+- **Build succeeded, then crashed at runtime on Winlator**: traced to
+  `TitleViewModel`'s constructor unconditionally calling `CheckGitHubNewerVersion()`
+  (a GitHub update check) on every launch -- needs `ws2_32`/`crypt32`/`sspicli`/
+  `System.IO.Compression.Native`, all of which fail to load in this environment,
+  triggering a native access violation no ordinary try/catch can intercept.
+  Removed the automatic call (method itself left in place for a future manual
+  "check for updates" button).
+- **App ran, but every label showed `[[missing:key]]`**: `Resources\Localization\lang.xaml`
+  had no build-action declaration at all after WPF's implicit "Page" globbing went
+  away with `UseWPF`, so it never made it to the output folder. Fixed via `<None Update>`
+  (matching the pattern already used elsewhere in this csproj for loose-file copies).
+  ~18 image files (Kurama mascot, logos, backgrounds) had the same root problem via
+  the WPF-only `<Resource>` item type -- converted all to `<Content>`.
+- **App ran, mods installed but with reduced fidelity, XFBIN_LIB features incomplete**:
+  swapped the `XFBIN_LIB` `ProjectReference` (built from the possibly-outdated
+  `XFBIN_LIB-main` GitHub source) for a direct `<Reference>` to the real, pre-built
+  `XFBIN_LIB.dll` pulled from the user's own compiled release (`NSC_mod_manager.zip`)
+  -- confirmed via `strings` that it has real implementations of `FindChunks`/
+  `RepackXfbinData`/`ChangeChunkNameAndPath`/`FoundChunk` and uses the exact same
+  namespaces as the source project, so zero code changes were needed elsewhere.
+  Also found and fixed a genuine functional regression: the WinForms rewrite's
+  Install-mod button/drag-drop had been reimplemented from scratch using
+  `System.IO.Compression.ZipFile` instead of calling the ViewModel's own
+  `InstallMod()` method -- which not only has proper error handling but also
+  supports the legacy `.nus4` mod format (embedded-ZIP extraction) that the
+  from-scratch version didn't handle at all. Now calls `VM.InstallMod()` /
+  `VM.InstallMod(path)` directly, matching the original button/drag-drop behavior
+  exactly.
 
 See the `nsc-modmanager-winlator` skill for the full diagnosis history (the
 original ModernWpf/WinRT crash) leading up to this rewrite.

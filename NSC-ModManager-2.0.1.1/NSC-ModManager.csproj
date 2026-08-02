@@ -240,6 +240,33 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\XFBIN_LIB\XFBIN_LIB.csproj" />
+    <!-- Using the pre-built XFBIN_LIB.dll from the user's original compiled release
+         (NSC_mod_manager.zip) instead of building from the XFBIN_LIB-main GitHub
+         source, which turned out to be an older/incomplete version missing
+         FindChunks/RepackXfbinData/ChangeChunkNameAndPath (NUS3BANKViewModel.cs
+         depends on all three). The precompiled DLL has the real implementations
+         instead of the hand-written approximations added earlier. Verified via
+         `strings` that its namespaces (XFBIN_LIB, XFBIN_LIB.XFBIN) match the source
+         project exactly, so no code changes were needed elsewhere, just this
+         reference swap. Target framework net7.0 x86, same as the source project. -->
+    <Reference Include="XFBIN_LIB">
+      <HintPath>Libs\XFBIN_LIB.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Libs\XFBIN_LIB.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\XFBIN_LIB.pdb">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- XFBIN_LIB.dll's own dependencies (matches the versions used to originally
+         build it, per the XFBIN_LIB source project's own csproj). -->
+    <PackageReference Include="JonSkeet.MiscUtil" Version="0.2.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 </Project>

@@ -215,7 +215,7 @@ namespace NSC_ModManager.View
 
             var buttonRow = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight };
             var installBtn = new Button { Text = Loc("m_mainWindow_010"), AutoSize = true };
-            installBtn.Click += (s, e) => BrowseAndInstallMod();
+            installBtn.Click += (s, e) => VM.InstallMod();
             var deleteBtn = new Button { Text = Loc("m_mainWindow_011"), AutoSize = true };
             deleteBtn.Click += (s, e) => RunCommand(VM.DeleteModCommand, VM.SelectedMod);
             var refreshBtn = new Button { Text = "Refresh", AutoSize = true };
@@ -491,40 +491,7 @@ namespace NSC_ModManager.View
             if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
             var files = (string[])e.Data.GetData(DataFormats.FileDrop);
             foreach (var modPath in files)
-                InstallModFile(modPath);
-        }
-
-        private void BrowseAndInstallMod()
-        {
-            using (var dlg = new OpenFileDialog { Filter = "NSC Mod files (*.nsc;*.ensc;*.uns;*.unse)|*.nsc;*.ensc;*.uns;*.unse|All files (*.*)|*.*" })
-            {
-                if (dlg.ShowDialog() == DialogResult.OK)
-                    InstallModFile(dlg.FileName);
-            }
-        }
-
-        private void InstallModFile(string modPath)
-        {
-            try
-            {
-                string modManagerFolder = Properties.Settings.Default.ModManagerFolder;
-                if (!Directory.Exists(modManagerFolder))
-                {
-                    MessageBox.Show("Select Mod folder!");
-                    return;
-                }
-                string installFolder = Path.Combine(modManagerFolder, Path.GetFileNameWithoutExtension(modPath));
-                if (Directory.Exists(installFolder))
-                    Directory.Delete(installFolder, true);
-                Directory.CreateDirectory(installFolder);
-                System.IO.Compression.ZipFile.ExtractToDirectory(modPath, installFolder);
-                VM.RefreshModList();
-            }
-            catch (Exception ex)
-            {
-                System.Media.SystemSounds.Exclamation.Play();
-                MessageBox.Show("Something went wrong.. Report issue on GitHub \n\n" + ex.StackTrace + " \n\n" + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+                VM.InstallMod(modPath);
         }
 
         // ---------------------------------------------------------------
